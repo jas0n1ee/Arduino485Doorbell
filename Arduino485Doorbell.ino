@@ -55,9 +55,7 @@ void publishCmd(const uint8_t* cmd) {
   rs485Serial.write(cmd, 4);
   rs485Serial.flush();  // Wait for transmission to complete
   digitalWrite(RS485_EN, LOW);   // Return to receive mode
-  // Serial.print("Published command: ");
-  // printHex(cmd, sizeof(cmd));
-  // Serial.println();
+  delay(5);  // 5ms delay as in Python code
 }
 
 void printHex(const uint8_t* data, size_t length) {
@@ -66,71 +64,78 @@ void printHex(const uint8_t* data, size_t length) {
     Serial.print(data[i], HEX);
   }
 }
+
 void loop() {
-  if (rs485Serial.available() >= 4) {  // Check if we have at least 4 bytes
-    uint8_t message[4];  // Buffer for incoming message
+  if (rs485Serial.available() >= 4) {
+    uint8_t message[4];
     int bytesRead = rs485Serial.readBytes(message, 4);
-    // Handle different messages
-    if (strstr(message, H_DISCOVER)) {
+    
+    if (memcmp(message, H_DISCOVER, 4) == 0) {
       Serial.println("Received H_DISCOVER Sent C_IMHERE");
       publishCmd(C_IMHERE);
     }
-    else if (strstr(message, H_RING)) {
+    else if (memcmp(message, H_RING, 4) == 0) {
       Serial.println("Received H_RING Sent C_RINGACK");
       publishCmd(C_RINGACK);
       currentState = RING;
     }
-    else if (strstr(message, H_PKUPACK)) {
+    else if (memcmp(message, H_PKUPACK, 4) == 0) {
       Serial.println("Received H_PKUPACK Sent C_SPKING");
       currentState = SPEAKING;
       publishCmd(C_SPKING);
     }
-    else if (strstr(message, H_UNLOCKACK)) {
+    else if (memcmp(message, H_UNLOCKACK, 4) == 0) {
       Serial.println("Received H_UNLOCKACK Sent C_SPKING");
       publishCmd(C_SPKING);
     }
-    else if (strstr(message, H_CALLHANGUPACK)) {
+    else if (memcmp(message, H_CALLHANGUPACK, 4) == 0) {
       Serial.println("Received H_CALLHANGUPACK Sent CHB");
       currentState = IDLE;
       publishCmd(CHB);
     }
-    else if (strstr(message, HHB)) {
-      Serial.println("Received HHB");
+    else if (memcmp(message, HHB, 4) == 0) {
       switch (currentState) {
         case IDLE:
-          Serial.println("Sending CHB");
           publishCmd(CHB);
           break;
         case RING:
-          Serial.println("Sending C_PKUP");
+          Serial.println("Received HHB, Sending C_PKUP");
           publishCmd(C_PKUP);
           break;
         case SPEAKING:
-          if (unlockCount < 5) {
-            Serial.println("Sending C_UNLOCK");
+          if (unlockCount < 10) {
+            Serial.println("Received HHB, Sending C_UNLOCK");
             publishCmd(C_UNLOCK);
             unlockCount++;
           } else {
-            Serial.println("Sending C_CALLHANGUP");
+            Serial.println("Received HHB, Sending C_CALLHANGUP");
             publishCmd(C_CALLHANGUP);
             unlockCount = 0;
           }
           break;
       }
     }
-    else if (strstr(message, H_ACK)) {
-      Serial.println("Received H_ACK");
+    else if (memcmp(message, H_ACK, 4) == 0) {
+      // Serial.println("Received H_ACK");
     }
     else {
       Serial.print("Unknown message: ");
       printHex(message, bytesRead);
-      Serial.println();
+      Serial.print(" length: ");
+      Serial.println(bytesRead);
       currentState = IDLE;
     }
 
     if (currentState != IDLE) {
       Serial.print("STATE: ");
-      Serial.println(currentState);
+      switch (currentState) {
+        case RING:
+          Serial.println("RING");
+          break;
+        case SPEAKING:
+          Serial.println("SPEAKING");
+          break;
+      }
     }
   }
 }
