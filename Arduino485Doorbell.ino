@@ -16,6 +16,7 @@ enum State {
 };
 
 State currentState = IDLE;
+int ringCount = 0;
 int unlockCount = 0;
 
 const uint8_t H_DISCOVER[] = {0xA1, 0x5A, 0x00, 0x7B};
@@ -99,12 +100,21 @@ void loop() {
           publishCmd(CHB);
           break;
         case RING:
-          Serial.println("Received HHB, Sending C_PKUP");
-          publishCmd(C_PKUP);
+          if (ringCount < 10) {
+            Serial.print("Received HHB, Sending CHB, ringCount: ");
+            Serial.println(ringCount);
+            publishCmd(CHB);
+            ringCount++;
+          } else {
+            Serial.println("Received HHB, Sending C_PKUP");
+            publishCmd(C_PKUP);
+            ringCount = 0;
+          }
           break;
         case SPEAKING:
           if (unlockCount < 10) {
-            Serial.println("Received HHB, Sending C_UNLOCK");
+            Serial.print("Received HHB, Sending C_UNLOCK, unlockCount: ");
+            Serial.println(unlockCount);
             publishCmd(C_UNLOCK);
             unlockCount++;
           } else {
